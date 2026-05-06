@@ -354,7 +354,9 @@ fn gui_html() -> &'static str {
       --accent-2: #f59e0b;
       --danger: #ef4444;
     }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: "JetBrains Mono", "Fira Code", monospace;
@@ -363,6 +365,7 @@ fn gui_html() -> &'static str {
       min-height: 100vh;
       padding: 20px;
     }
+
     .wrap {
       max-width: 1200px;
       margin: 0 auto;
@@ -370,12 +373,27 @@ fn gui_html() -> &'static str {
       grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
+
     .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
+      background: rgba(17,24,39,0.85);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
       overflow: hidden;
+      backdrop-filter: blur(14px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.03),
+        0 10px 30px rgba(0,0,0,0.4),
+        0 0 40px rgba(34,197,94,0.05);
+      transition: all 0.25s ease;
     }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 15px 40px rgba(0,0,0,0.5),
+        0 0 50px rgba(34,197,94,0.08);
+    }
+
     .head {
       display: flex;
       align-items: center;
@@ -384,27 +402,42 @@ fn gui_html() -> &'static str {
       border-bottom: 1px solid rgba(255,255,255,0.1);
       background: rgba(17,24,39,0.7);
     }
+
     .title {
       font-size: 14px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
       color: var(--muted);
     }
+
     .actions {
       display: flex;
       gap: 8px;
     }
+
     button {
       border: 0;
-      border-radius: 8px;
-      padding: 8px 12px;
+      border-radius: 10px;
+      padding: 10px 16px;
       font-weight: 700;
       cursor: pointer;
       font-family: inherit;
+      transition: all 0.2s ease;
     }
+    
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+    
+    button:active {
+      transform: scale(0.98);
+    }
+
     #runBtn { background: var(--accent); color: #052e16; }
     #demoBtn { background: var(--accent-2); color: #451a03; }
     #clearBtn { background: var(--danger); color: #450a0a; }
+
     textarea {
       width: 100%;
       min-height: 72vh;
@@ -418,24 +451,86 @@ fn gui_html() -> &'static str {
       font-size: 14px;
       line-height: 1.45;
     }
+
     pre {
       margin: 0;
-      padding: 14px;
+      padding: 18px;
       min-height: 72vh;
-      background: var(--panel-2);
+      background:
+        radial-gradient(circle at top, #1e293b, #111827);
       color: #d1fae5;
       overflow: auto;
       font-size: 14px;
-      line-height: 1.45;
+      line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
     }
+
     .status {
       padding: 10px 14px;
       color: var(--muted);
       border-top: 1px solid rgba(255,255,255,0.08);
       font-size: 12px;
     }
+
+    .complexity-report {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .metric {
+      font-weight: bold;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 15px;
+      letter-spacing: 0.3px;
+      display: block;
+    }
+
+    .time {
+      background: rgba(59,130,246,0.15);
+      border: 1px solid #3b82f6;
+      color: #93c5fd;
+    }
+
+    .space {
+      background: rgba(168,85,247,0.15);
+      border: 1px solid #a855f7;
+      color: #d8b4fe;
+    }
+
+    .ops {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid #22c55e;
+      color: #86efac;
+    }
+
+    .alloc {
+      background: rgba(245,158,11,0.15);
+      border: 1px solid #f59e0b;
+      color: #fcd34d;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    
+    .hero h1 {
+      margin: 0;
+      font-size: 52px;
+      letter-spacing: 6px;
+      color: #22c55e;
+      text-shadow: 0 0 20px rgba(34,197,94,0.4);
+    }
+    
+    .hero p {
+      margin-top: 6px;
+      color: #94a3b8;
+    }
+
     @media (max-width: 1000px) {
       .wrap { grid-template-columns: 1fr; }
       textarea, pre { min-height: 46vh; }
@@ -443,6 +538,11 @@ fn gui_html() -> &'static str {
   </style>
 </head>
 <body>
+    <div class="hero">
+    <h1>OPTIMUS</h1>
+    <p>Programming Language + Complexity Analyzer</p>
+  </div>
+
   <div class="wrap">
     <section class="card">
       <div class="head">
@@ -520,7 +620,7 @@ print(c.inc(5));`;
         });
 
         const text = await res.text();
-        output.textContent = text;
+        output.innerHTML = text;
         status.textContent = res.ok ? 'Done' : 'Error';
       } catch (err) {
         output.textContent = String(err);

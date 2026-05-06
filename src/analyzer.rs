@@ -899,10 +899,17 @@ impl Analyzer {
 
         let space = if self.space_allocations > 100 { "O(N)" } else { "O(1)" };
 
-        println!("Time Complexity:  {}", time);
-        println!("Space Complexity: {}", space);
-        println!("Operations:       {}", self.time_cost);
-        println!("Allocations:      {}", self.space_allocations);
-        println!("========================================\n");
+        println!(
+    r#"<div class="complexity-report">
+    <span class="metric time">Time Complexity:  {}</span>
+    <span class="metric space">Space Complexity: {}</span>
+    <span class="metric ops">Operations:       {}</span>
+    <span class="metric alloc">Allocations:      {}</span>
+    </div>"#,
+        time,
+        space,
+        self.time_cost,
+        self.space_allocations
+    );
     }
 }
