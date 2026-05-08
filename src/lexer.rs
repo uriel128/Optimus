@@ -1,108 +1,72 @@
 use logos::Logos;
 
-#[derive(Logos, Debug, PartialEq, Clone, Hash, Eq)]
-#[logos(skip r"[ \t\n\f\r]+")]
-#[logos(skip r"//.*")]
+#[derive(Logos, Debug, Clone, PartialEq, Eq, Hash)]
+#[logos(skip r"[ \t\r\n\f]+")]
+#[logos(skip r"//[^\n]*")]
 pub enum Token {
-    // Keywords
-    #[token("mut")]
-    Mut,
-    #[token("ref")]
-    Ref,
-    #[token("int")]
-    IntType,
-    #[token("float")]
-    FloatType,
-    #[token("bool")]
-    BoolType,
-    #[token("string")]
-    StringType,
-    #[token("fn")]
-    Fn,
-    #[token("return")]
-    Return,
-    #[token("class")]
-    Class,
-    #[token("module")]
-    Module,
-    #[token("import")]
-    Import,
-    #[token("new")]
-    New,
-    #[token("if")]
-    If,
-    #[token("else")]
-    Else,
-    #[token("while")]
-    While,
-    #[token("for")]
-    For,
-    #[token("in")]
-    In,
-    #[token("true")]
-    True,
-    #[token("false")]
-    False,
-    #[token("null")]
-    Null,
-    #[token("print")]
-    Print,
+    #[token("fn")]     Fn,
+    #[token("class")]  Class,
+    #[token("module")] Module,
+    #[token("import")] Import,
+    #[token("if")]     If,
+    #[token("else")]   Else,
+    #[token("while")]  While,
+    #[token("for")]    For,
+    #[token("in")]     In,     
+    #[token("break")]  Break,   
+    #[token("return")] Return,
+    #[token("print")]  Print,
+    #[token("new")]    New,
+    #[token("mut")]    Mut,
+    #[token("let")]    Let,     
 
-    // Symbols & Operators
-    #[token("==")]
-    Equals,
-    #[token("!=")]
-    NotEquals,
-    #[token("=")]
-    Assign,
-    #[token(">")]
-    Greater,
-    #[token("<")]
-    Less,
-    #[token("+")]
-    Plus,
-    #[token("-")]
-    Minus,
-    #[token("*")]
-    Asterisk,
-    #[token("/")]
-    Slash,
-    #[token("!")]
-    Bang,
-    #[token(";")]
-    Semicolon,
-    #[token(":")]
-    Colon,
-    #[token(",")]
-    Comma,
-    #[token(".")]
-    Dot,
-    #[token("{")]
-    LBrace,
-    #[token("}")]
-    RBrace,
-    #[token("[")]
-    LBracket,
-    #[token("]")]
-    RBracket,
-    #[token("(")]
-    LParen,
-    #[token(")")]
-    RParen,
+    #[token("int")]    IntType,
+    #[token("float")]  FloatType,
+    #[token("string")] StringType,
+    #[token("bool")]   BoolType,
 
-    // Dynamic values
-    #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
-    Identifier(String),
+    
+    #[token("true")]  True,
+    #[token("false")] False,
+    #[token("null")]  Null,
+    #[token("none")]  None,   // NEW – spec alias for null
 
-    #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-    Integer(i64),
-
-    #[regex(r"[0-9]*\.[0-9]+", |lex| lex.slice().to_string())]
+    #[regex(r"\d+\.\d*|\.\d+", |lex| lex.slice().to_string())]
     Float(String),
 
-    #[regex(r#"\"([^\"\\]|\\.)*\""#, |lex| {
+    #[regex(r"\d+", |lex| lex.slice().parse::<i64>().unwrap_or(0))]
+    Integer(i64),
+
+    #[regex(r#""[^"]*""#, |lex| {
         let s = lex.slice();
         s[1..s.len() - 1].to_string()
     })]
     String(String),
+
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
+    Identifier(String),
+
+    #[token("==")] Equals,
+    #[token("!=")] NotEquals,
+
+    #[token("+")] Plus,
+    #[token("-")] Minus,
+    #[token("*")] Asterisk,
+    #[token("/")] Slash,
+    #[token("!")] Bang,
+    #[token("<")] Less,
+    #[token(">")] Greater,
+    #[token("=")] Assign,
+
+    #[token("(")] LParen,
+    #[token(")")] RParen,
+    #[token("{")] LBrace,
+    #[token("}")] RBrace,
+    #[token("[")] LBracket,  
+    #[token("]")] RBracket,  
+
+    #[token(";")] Semicolon,
+    #[token(",")] Comma,
+    #[token(".")] Dot,
+    #[token(":")] Colon,
 }

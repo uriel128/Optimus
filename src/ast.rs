@@ -23,6 +23,11 @@ pub enum Expression {
         class_name: String,
         arguments: Vec<Expression>,
     },
+    Array(Vec<Expression>),
+    Index {
+        collection: Box<Expression>,
+        index: Box<Expression>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +64,10 @@ pub enum AssignmentTarget {
         object: Expression,
         member: String,
     },
+    Index {
+        collection: Expression,
+        index: Expression,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,6 +100,11 @@ pub enum Statement {
         name: String,
         value: Expression,
     },
+    LetDecl {
+        is_mutable: bool,
+        name: String,
+        value: Expression,
+    },
     Assignment {
         target: AssignmentTarget,
         value: Expression,
@@ -116,6 +130,13 @@ pub enum Statement {
         increment: Box<Statement>,
         body: Box<Statement>,
     },
+    ForIn {
+        var: String,
+        iterable: Expression,
+        body: Box<Statement>,
+    },
+
+    Break,
 
     FunctionDecl(FunctionDecl),
     Return(Option<Expression>),

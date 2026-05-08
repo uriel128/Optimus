@@ -1,6 +1,6 @@
 use crate::ast::{
-    AssignmentTarget, BinaryOperator, ClassField, Expression, FunctionDecl, Literal, Parameter, Statement,
-    UnaryOperator,
+    AssignmentTarget, BinaryOperator, ClassField, Expression, FunctionDecl, Literal, Parameter,
+    Statement, UnaryOperator,
 };
 use crate::lexer::Token;
 use chumsky::prelude::*;
@@ -9,6 +9,7 @@ use chumsky::prelude::*;
 enum Postfix {
     Call(Vec<Expression>),
     Member(String),
+    Index(Expression), // NEW – arr[i], map["key"]
 }
 
 #[derive(Debug, Clone)]
@@ -45,21 +46,22 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
     let ident = select! { Token::Identifier(name) => name };
 
     let type_name = select! {
-        Token::IntType => "int".to_string(),
-        Token::FloatType => "float".to_string(),
+        Token::IntType    => "int".to_string(),
+        Token::FloatType  => "float".to_string(),
         Token::StringType => "string".to_string(),
-        Token::BoolType => "bool".to_string(),
+        Token::BoolType   => "bool".to_string(),
         Token::Identifier(name) => name,
     };
 
     let expr = recursive(|expr| {
         let literal = select! {
             Token::Integer(n) => Expression::Literal(Literal::Int(n)),
-            Token::Float(s) => Expression::Literal(Literal::Float(s.parse().unwrap_or(0.0))),
-            Token::String(s) => Expression::Literal(Literal::Str(s)),
-            Token::True => Expression::Literal(Literal::Bool(true)),
-            Token::False => Expression::Literal(Literal::Bool(false)),
-            Token::Null => Expression::Literal(Literal::Null),
+            Token::Float(s)   => Expression::Literal(Literal::Float(s.parse().unwrap_or(0.0))),
+            Token::String(s)  => Expression::Literal(Literal::Str(s)),
+            Token::True       => Expression::Literal(Literal::Bool(true)),
+            Token::False      => Expression::Literal(Literal::Bool(false)),
+            Token::Null       => Expression::Literal(Literal::Null),
+            Token::None       => Expression::Literal(Literal::Null), // NEW – none is alias for null
         };
 
         let call_args = expr
@@ -71,13 +73,18 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
         let new_expr = just(Token::New)
             .ignore_then(ident.clone())
             .then(call_args.clone())
-            .map(|(class_name, arguments)| Expression::New {
-                class_name,
-                arguments,
-            });
+            .map(|(class_name, arguments)| Expression::New { class_name, arguments });
+
+        let array_literal = expr
+            .clone()
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .delimited_by(just(Token::LBracket), just(Token::RBracket))
+            .map(Expression::Array);
 
         let atom = choice((
             new_expr,
+            array_literal, // NEW
             literal,
             ident.clone().map(Expression::Identifier),
             expr.clone()
@@ -86,7 +93,13 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
 
         let postfix = call_args
             .map(Postfix::Call)
-            .or(just(Token::Dot).ignore_then(ident.clone()).map(Postfix::Member));
+            .or(just(Token::Dot)
+                .ignore_then(ident.clone())
+                .map(Postfix::Member))
+            .or(expr
+                .clone()
+                .delimited_by(just(Token::LBracket), just(Token::RBracket))
+                .map(Postfix::Index));
 
         let postfixed = atom
             .clone()
@@ -99,6 +112,11 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
                 Postfix::Member(member) => Expression::MemberAccess {
                     object: Box::new(left),
                     member,
+                },
+           
+                Postfix::Index(index) => Expression::Index {
+                    collection: Box::new(left),
+                    index: Box::new(index),
                 },
             });
 
@@ -180,20 +198,32 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             .delimited_by(just(Token::LBrace), just(Token::RBrace))
             .map(Statement::Block);
 
+
         let var_decl = just(Token::Mut)
             .or_not()
             .then(type_name.clone())
             .then(ident.clone())
             .then_ignore(just(Token::Assign))
             .then(expr.clone())
-            .map(
-                |(((opt_mut, var_type), name), value)| Statement::VariableDecl {
-                    is_mutable: opt_mut.is_some(),
-                    var_type,
-                    name,
-                    value,
-                },
-            );
+            .map(|(((opt_mut, var_type), name), value)| Statement::VariableDecl {
+                is_mutable: opt_mut.is_some(),
+                var_type,
+                name,
+                value,
+            });
+
+        let let_decl = just(Token::Mut)
+            .or_not()
+            .then_ignore(just(Token::Let))
+            .then(ident.clone())
+            .then_ignore(just(Token::Assign))
+            .then(expr.clone())
+            .map(|((opt_mut, name), value)| Statement::LetDecl {
+                is_mutable: opt_mut.is_some(),
+                name,
+                value,
+            });
+
 
         let assignment_no_semicolon = ident
             .clone()
@@ -205,10 +235,27 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
                 value,
             });
 
-        let var_decl_stmt = var_decl.clone().then_ignore(just(Token::Semicolon));
-        let assignment_stmt = assignment_no_semicolon
+        let index_assign_no_semicolon = ident
             .clone()
-            .then_ignore(just(Token::Semicolon));
+            .then(
+                expr.clone()
+                    .delimited_by(just(Token::LBracket), just(Token::RBracket)),
+            )
+            .then_ignore(just(Token::Assign))
+            .then(expr.clone())
+            .map(|((name, index), value)| Statement::Assignment {
+                target: AssignmentTarget::Index {
+                    collection: Expression::Identifier(name),
+                    index,
+                },
+                value,
+            });
+
+        let var_decl_stmt       = var_decl.clone().then_ignore(just(Token::Semicolon));
+        let let_decl_stmt       = let_decl.then_ignore(just(Token::Semicolon));
+        let assignment_stmt     = assignment_no_semicolon.clone().then_ignore(just(Token::Semicolon));
+        let index_assign_stmt   = index_assign_no_semicolon.clone().then_ignore(just(Token::Semicolon));
+
 
         let print_stmt = just(Token::Print)
             .ignore_then(
@@ -222,6 +269,11 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             .ignore_then(expr.clone().or_not())
             .then_ignore(just(Token::Semicolon))
             .map(Statement::Return);
+
+        let break_stmt = just(Token::Break)
+            .then_ignore(just(Token::Semicolon))
+            .map(|_| Statement::Break);
+
 
         let parameter = type_name
             .clone()
@@ -246,6 +298,7 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             });
 
         let function_decl_stmt = function_decl_data.clone().map(Statement::FunctionDecl);
+
 
         let class_field = just(Token::Mut)
             .or_not()
@@ -274,20 +327,15 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             .map(|(name, items)| {
                 let mut fields = Vec::new();
                 let mut methods = Vec::new();
-
                 for item in items {
                     match item {
-                        ClassItem::Field(field) => fields.push(field),
-                        ClassItem::Method(method) => methods.push(method),
+                        ClassItem::Field(f)  => fields.push(f),
+                        ClassItem::Method(m) => methods.push(m),
                     }
                 }
-
-                Statement::ClassDecl {
-                    name,
-                    fields,
-                    methods,
-                }
+                Statement::ClassDecl { name, fields, methods }
             });
+
 
         let module_decl = just(Token::Module)
             .ignore_then(ident.clone())
@@ -302,6 +350,7 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             .ignore_then(ident.clone())
             .then_ignore(just(Token::Semicolon))
             .map(Statement::Import);
+
 
         let if_stmt = recursive(|if_stmt| {
             just(Token::If)
@@ -333,6 +382,8 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
                 body: Box::new(body),
             });
 
+        
+
         let for_init = var_decl
             .clone()
             .or(assignment_no_semicolon.clone())
@@ -342,21 +393,34 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             .clone()
             .or(expr.clone().map(Statement::Expression));
 
-        let for_loop = just(Token::For)
-            .ignore_then(just(Token::LParen))
-            .ignore_then(for_init)
-            .then_ignore(just(Token::Semicolon))
-            .then(expr.clone())
-            .then_ignore(just(Token::Semicolon))
-            .then(for_increment)
-            .then_ignore(just(Token::RParen))
-            .then(block.clone())
-            .map(|(((init, condition), increment), body)| Statement::ForLoop {
-                init: Box::new(init),
-                condition,
-                increment: Box::new(increment),
-                body: Box::new(body),
-            });
+        let for_stmt = just(Token::For).ignore_then(
+            just(Token::LParen)
+                .ignore_then(for_init)
+                .then_ignore(just(Token::Semicolon))
+                .then(expr.clone())
+                .then_ignore(just(Token::Semicolon))
+                .then(for_increment)
+                .then_ignore(just(Token::RParen))
+                .then(block.clone())
+                .map(|(((init, condition), increment), body)| Statement::ForLoop {
+                    init: Box::new(init),
+                    condition,
+                    increment: Box::new(increment),
+                    body: Box::new(body),
+                })
+                .or(
+                    ident
+                        .clone()
+                        .then_ignore(just(Token::In))
+                        .then(expr.clone())
+                        .then(block.clone())
+                        .map(|((var, iterable), body)| Statement::ForIn {
+                            var,
+                            iterable,
+                            body: Box::new(body),
+                        }),
+                ),
+        );
 
         let expr_stmt = expr
             .clone()
@@ -367,11 +431,14 @@ pub fn parser() -> impl Parser<Token, Vec<Statement>, Error = Simple<Token>> {
             .or(class_decl)
             .or(module_decl)
             .or(import_stmt)
+            .or(let_decl_stmt)       
             .or(var_decl_stmt)
+            .or(index_assign_stmt)   
             .or(assignment_stmt)
             .or(print_stmt)
             .or(return_stmt)
-            .or(for_loop)
+            .or(break_stmt)          
+            .or(for_stmt)            
             .or(if_stmt)
             .or(while_loop)
             .or(block)
