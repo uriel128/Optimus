@@ -2,6 +2,9 @@
 
 Optimus is a Rust-based language prototype that combines execution with built-in algorithm complexity reporting.
 
+# Video Demonstration
+https://drive.google.com/drive/folders/1zCtVD8gKINd1HPR-_Esw-K6PpvxEmTcN?usp=share_link
+
 ## What Is Complete
 
 This prototype now includes a complete demonstration path with:
